@@ -1,2 +1,2 @@
 # ARP
-A example to send ARP on Linux
+Examples to send ARP on Linux or Windows.
