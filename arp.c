@@ -19,6 +19,8 @@
 #define HW_LEN_FOR_IP               0x04
 #define PROTO_TYPE_FOR_IP           0x0800
 
+#define DBG_ARP
+
 typedef unsigned char byte1;
 typedef unsigned short int byte2;
 typedef unsigned int byte4;
@@ -42,23 +44,23 @@ typedef struct arp_packet
     byte1 target_mac[6];
     byte4 target_ip;
     /* Padding */
-    char padding[18];
+    //char padding[18];
 }ARP_PKT;
 
 int print_pkt(char *, int len);
 
 int main(int argc, char *argv[])
 {
-    int arp_fd,if_fd,retVal;
+    int arp_fd, if_fd, retVal;
     struct sockaddr_in *sin;
     struct sockaddr_ll sa;
     struct ifreq ifr;
     ARP_PKT pkt;
-    unsigned long int ipAddr;
+    unsigned int ipAddr;
 
-    if (argc != 3)
-    {
-        printf("Usage: ./arp \n");
+    if (argc != 3) {
+        printf("Usage: ./arp interface_name target_ip\n");
+        printf("       ./arp eth0 192.168.0.1\n");
         exit(1);
     }
     else if (getuid() && geteuid())
@@ -71,8 +73,7 @@ int main(int argc, char *argv[])
 
     /* Open socket for accessing the IPv4 address of specified Interface */
     if_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (if_fd < 0)
-    {
+    if (if_fd < 0) {
         perror("IF Socket");
         exit(1);
     }
@@ -81,8 +82,7 @@ int main(int argc, char *argv[])
     memcpy(ifr.ifr_name, argv[1], IF_NAMESIZE);
     /* IOCTL to get ip address */
     retVal = ioctl(if_fd, SIOCGIFADDR, &ifr, sizeof(ifr));
-    if (retVal < 0)
-    {
+    if (retVal < 0) {
         perror("IOCTL");
         close(if_fd);
         exit(1);
@@ -91,36 +91,37 @@ int main(int argc, char *argv[])
     /* Simple typecasting for easy access to ip address */
     sin = (struct sockaddr_in *)&ifr.ifr_addr;
     ipAddr = ntohl(sin->sin_addr.s_addr);
+
 #ifdef DBG_ARP
     printf("IF Name: %s IP Address: %s ",argv[1], inet_ntoa(sin->sin_addr));
     printf("IP = 0x%x\n",ipAddr);
 #endif
 
     retVal = ioctl(if_fd, SIOCGIFHWADDR, &ifr, sizeof(ifr));
-    if (retVal < 0)
-    {
+    if (retVal < 0) {
         perror("IOCTL");
         close(if_fd);
         exit(1);
     }
+
 #ifdef DBG_ARP
     printf("MAC address: %s is %02x:%02x:%02x:%02x:%02x:%02x \n",
-           argv[1],
-           ifr.ifr_hwaddr.sa_data[0]&0xFF,
-           ifr.ifr_hwaddr.sa_data[1]&0xFF,
-           ifr.ifr_hwaddr.sa_data[2]&0xFF,
-           ifr.ifr_hwaddr.sa_data[3]&0xFF,
-           ifr.ifr_hwaddr.sa_data[4]&0xFF,
-           ifr.ifr_hwaddr.sa_data[5]&0xFF);
+        argv[1],
+        ifr.ifr_hwaddr.sa_data[0]&0xFF,
+        ifr.ifr_hwaddr.sa_data[1]&0xFF,
+        ifr.ifr_hwaddr.sa_data[2]&0xFF,
+        ifr.ifr_hwaddr.sa_data[3]&0xFF,
+        ifr.ifr_hwaddr.sa_data[4]&0xFF,
+        ifr.ifr_hwaddr.sa_data[5]&0xFF
+    );
 #endif
-    /* -----------------------------END of IP,MAC ADDRESS ACCESS------------------------ */
+    /* -----------------------------END of IP, MAC ADDRESS ACCESS------------------------ */
 
 
     /* =============================Start of ARP request sending==================== */
     /* Socket to send ARP packet */
     arp_fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
-    if (arp_fd == -1)
-    {
+    if (arp_fd == -1) {
         perror("ARP Socket");
         close(if_fd);
         exit(1);
@@ -147,13 +148,12 @@ int main(int argc, char *argv[])
     memset(pkt.target_mac, 0, (6 * sizeof(byte1)));
     pkt.target_ip = inet_addr(argv[2]);
     /* Padding */
-    memset(pkt.padding, 0, 18 * sizeof(byte1));
+    //memset(pkt.padding, 0, 18 * sizeof(byte1));
 
 
     /* For sending the packet We need it! */
     retVal = ioctl(if_fd, SIOCGIFINDEX, &ifr, sizeof(ifr));
-    if (retVal < 0)
-    {
+    if (retVal < 0) {
         perror("IOCTL");
         close(arp_fd);
         close(if_fd);
@@ -165,8 +165,7 @@ int main(int argc, char *argv[])
 
     /* Send it! */
     retVal = sendto(arp_fd, &pkt, sizeof(pkt), 0, (struct sockaddr *)&sa, sizeof(sa));
-    if (retVal < 0)
-    {
+    if (retVal < 0) {
         perror("sendto");
         close(arp_fd);
         close(if_fd);
@@ -177,17 +176,18 @@ int main(int argc, char *argv[])
     printf("\n=========PACKET=========\n");
     print_pkt((void *)&pkt, sizeof(pkt));
 #endif
+
     return 0;
 }
 
 int print_pkt(char *buf, int len)
 {
     int j = 0;
-    for (j = 0; j < len; j++)
-    {
-        if ((j%16) == 0 && j != 0)
+    for (j = 0; j < len; j++) {
+        if ((j%16) == 0 && j != 0) {
             printf("\n");
-        printf("%02x ", *(buf+j)& 0xFF);
+        }
+        printf("%02x ", *(buf+j) & 0xFF);
     }
     printf("\n");
     return 0;
